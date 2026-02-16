@@ -57,3 +57,39 @@ describe('Database class', () => {
     expect(db.findAll()).toEqual([]);
   });
 });
+
+describe('Database tests', () => {
+  let database;
+  
+  beforeAll(async () => {
+    // Connect to test database (once)
+    database = await connectToDatabase('test');
+  });
+  
+  beforeEach(async () => {
+    // Clear all data before each test
+    await database.clear();
+  });
+  
+  afterEach(() => {
+    // Reset all mocks after each test
+    jest.clearAllMocks();
+  });
+  
+  afterAll(async () => {
+    // Close database connection (once)
+    await database.close();
+  });
+  
+  test('creates user', async () => {
+    await database.createUser({ name: 'John' });
+    const users = await database.getUsers();
+    expect(users).toHaveLength(1);
+  });
+  
+  test('starts with empty database', async () => {
+    // This passes because beforeEach cleared data
+    const users = await database.getUsers();
+    expect(users).toHaveLength(0);
+  });
+});
