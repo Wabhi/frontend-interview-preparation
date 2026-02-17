@@ -1,7 +1,6 @@
-// Counter.jsx
 import { useState } from 'react';
 
-function Counter() {
+const Counter =()=> {
   const [count, setCount] = useState(0);
   
   return (
@@ -14,4 +13,5 @@ function Counter() {
   );
 }
 
+// This line matches the "default" requirement in the error message
 export default Counter;
