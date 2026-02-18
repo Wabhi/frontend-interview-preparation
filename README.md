@@ -3271,3 +3271,986 @@ When discussing these tests in interviews:
 This is a **production-ready, comprehensive test suite** that demonstrates professional React testing practices! 🚀
 
 Practice writing similar tests for your own components, and you'll be interview-ready! 💪
+
+>gggg>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+Part 1: Understanding Async in Testing
+Why Async Testing is Critical for Interviews
+Real Interview Question:
+
+"How do you test a component that fetches data from an API and displays it?"
+
+This tests your understanding of:
+
+Async/await in tests
+Mock implementations
+Loading/error states
+findBy queries
+waitFor utilities
+
+
+Setup for Day 3-4
+First, install additional dependencies:
+bashnpm install -D axios msw @testing-library/react-hooks
+
+1. The Three Query Types (CRITICAL!)
+Create src/day3-practice/queries-explained.test.jsx:
+javascriptimport { render, screen } from '@testing-library/react';
+import { useState, useEffect } from 'react';
+
+function DataComponent() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setTimeout(() => {
+      setData('Loaded!');
+      setLoading(false);
+    }, 100);
+  }, []);
+
+  if (loading) return <div>Loading...</div>;
+  return <div>{data}</div>;
+}
+
+describe('Understanding getBy vs queryBy vs findBy', () => {
+  
+  // ====================================
+  // getBy - Throws error if NOT found
+  // ====================================
+  test('getBy - for elements that MUST exist', () => {
+    render(<DataComponent />);
+    
+    // This element exists immediately
+    const loadingElement = screen.getByText('Loading...');
+    expect(loadingElement).toBeInTheDocument();
+    
+    // This would THROW an error ❌
+    // const dataElement = screen.getByText('Loaded!');
+    // Error: Unable to find an element with text: Loaded!
+  });
+
+  // ====================================
+  // queryBy - Returns NULL if not found
+  // ====================================
+  test('queryBy - for elements that might NOT exist', () => {
+    render(<DataComponent />);
+    
+    // Check if element exists
+    const loadingElement = screen.queryByText('Loading...');
+    expect(loadingElement).toBeInTheDocument();
+    
+    // This returns null (no error) ✓
+    const dataElement = screen.queryByText('Loaded!');
+    expect(dataElement).not.toBeInTheDocument(); // null
+  });
+
+  // ====================================
+  // findBy - ASYNC - waits for element
+  // ====================================
+  test('findBy - for elements that appear LATER', async () => {
+    render(<DataComponent />);
+    
+    // Initially shows loading
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    
+    // Wait for async element (returns Promise)
+    const dataElement = await screen.findByText('Loaded!');
+    expect(dataElement).toBeInTheDocument();
+    
+    // Loading is now gone
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+  });
+
+  // ====================================
+  // WHEN TO USE EACH
+  // ====================================
+  test('Decision tree for queries', () => {
+    /*
+    
+    Is element ALWAYS present immediately?
+      YES → use getBy
+      
+    Is element NEVER present (checking absence)?
+      YES → use queryBy
+      
+    Does element appear AFTER async operation?
+      YES → use findBy
+    
+    */
+  });
+});
+```
+
+**Interview Answer Template:**
+```
+Q: What's the difference between getBy, queryBy, and findBy?
+
+A: 
+- getBy: Throws error if not found. Use for elements that must exist.
+- queryBy: Returns null if not found. Use to check if element doesn't exist.
+- findBy: Returns Promise, waits for element. Use for async elements.
+
+Example: Testing a component that fetches data:
+- getBy for the initial loading state
+- findBy to wait for loaded data
+- queryBy to confirm loading state is gone
+
+2. Mocking Fetch API (Interview Favorite!)
+Create src/day3-practice/fetch-mock.test.jsx:
+javascriptimport { render, screen } from '@testing-library/react';
+import { useState, useEffect } from 'react';
+
+// ====================================
+// Component to Test
+// ====================================
+function UserProfile({ userId }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+
+    fetch(`https://api.example.com/users/${userId}`)
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to fetch');
+        return response.json();
+      })
+      .then(data => {
+        setUser(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [userId]);
+
+  if (loading) return <div>Loading user...</div>;
+  if (error) return <div role="alert">Error: {error}</div>;
+  if (!user) return <div>No user found</div>;
+
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <p>{user.email}</p>
+      <p>Role: {user.role}</p>
+    </div>
+  );
+}
+
+// ====================================
+// TESTS
+// ====================================
+describe('Mocking Fetch API - Complete Guide', () => {
+
+  // Setup: Mock fetch globally
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  // ====================================
+  // Test 1: Successful API Call
+  // ====================================
+  test('displays user data after successful fetch', async () => {
+    // Arrange: Mock the API response
+    const mockUser = {
+      id: 1,
+      name: 'John Doe',
+      email: 'john@example.com',
+      role: 'Admin'
+    };
+
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockUser,
+    });
+
+    // Act: Render component
+    render(<UserProfile userId={1} />);
+
+    // Assert: Check loading state first
+    expect(screen.getByText('Loading user...')).toBeInTheDocument();
+
+    // Assert: Wait for data to appear
+    const heading = await screen.findByRole('heading', { name: 'John Doe' });
+    expect(heading).toBeInTheDocument();
+    expect(screen.getByText('john@example.com')).toBeInTheDocument();
+    expect(screen.getByText('Role: Admin')).toBeInTheDocument();
+
+    // Assert: Loading is gone
+    expect(screen.queryByText('Loading user...')).not.toBeInTheDocument();
+
+    // Assert: Fetch was called correctly
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith('https://api.example.com/users/1');
+  });
+
+  // ====================================
+  // Test 2: Failed API Call (Network Error)
+  // ====================================
+  test('displays error message when fetch fails', async () => {
+    // Arrange: Mock fetch to fail
+    global.fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404
+    });
+
+    // Act
+    render(<UserProfile userId={999} />);
+
+    // Assert: Check loading first
+    expect(screen.getByText('Loading user...')).toBeInTheDocument();
+
+    // Assert: Wait for error
+    const errorMessage = await screen.findByRole('alert');
+    expect(errorMessage).toHaveTextContent('Error: Failed to fetch');
+
+    // Assert: No user data shown
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+  });
+
+  // ====================================
+  // Test 3: Network Rejection
+  // ====================================
+  test('handles network errors', async () => {
+    // Arrange: Mock network failure
+    global.fetch.mockRejectedValueOnce(new Error('Network error'));
+
+    // Act
+    render(<UserProfile userId={1} />);
+
+    // Assert
+    const errorMessage = await screen.findByRole('alert');
+    expect(errorMessage).toHaveTextContent('Error: Network error');
+  });
+
+  // ====================================
+  // Test 4: Multiple Sequential Fetches
+  // ====================================
+  test('handles changing userId prop', async () => {
+    const mockUser1 = { id: 1, name: 'User 1', email: 'user1@example.com', role: 'User' };
+    const mockUser2 = { id: 2, name: 'User 2', email: 'user2@example.com', role: 'Admin' };
+
+    global.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockUser1,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockUser2,
+      });
+
+    const { rerender } = render(<UserProfile userId={1} />);
+
+    // First user loads
+    expect(await screen.findByText('User 1')).toBeInTheDocument();
+
+    // Change userId
+    rerender(<UserProfile userId={2} />);
+
+    // Second user loads
+    expect(await screen.findByText('User 2')).toBeInTheDocument();
+    expect(screen.queryByText('User 1')).not.toBeInTheDocument();
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+3. Mocking Axios (Very Common in Interviews!)
+Create src/day3-practice/axios-mock.test.jsx:
+javascriptimport { render, screen, waitFor } from '@testing-library/react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+
+// Mock axios module
+jest.mock('axios');
+
+// ====================================
+// Component Using Axios
+// ====================================
+function ProductList() {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    axios.get('/api/products')
+      .then(response => {
+        setProducts(response.data);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) return <div>Loading products...</div>;
+  if (error) return <div role="alert">Error: {error}</div>;
+
+  return (
+    <div>
+      <h1>Products</h1>
+      <ul>
+        {products.map(product => (
+          <li key={product.id}>
+            {product.name} - ${product.price}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ====================================
+// TESTS
+// ====================================
+describe('Mocking Axios - Interview Focus', () => {
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // ====================================
+  // Test 1: Successful GET request
+  // ====================================
+  test('fetches and displays products', async () => {
+    // Arrange: Mock axios response
+    const mockProducts = [
+      { id: 1, name: 'Laptop', price: 999 },
+      { id: 2, name: 'Mouse', price: 25 },
+      { id: 3, name: 'Keyboard', price: 75 }
+    ];
+
+    axios.get.mockResolvedValueOnce({
+      data: mockProducts
+    });
+
+    // Act
+    render(<ProductList />);
+
+    // Assert: Loading state
+    expect(screen.getByText('Loading products...')).toBeInTheDocument();
+
+    // Assert: Products appear
+    expect(await screen.findByText('Products')).toBeInTheDocument();
+    expect(screen.getByText('Laptop - $999')).toBeInTheDocument();
+    expect(screen.getByText('Mouse - $25')).toBeInTheDocument();
+    expect(screen.getByText('Keyboard - $75')).toBeInTheDocument();
+
+    // Assert: Axios called correctly
+    expect(axios.get).toHaveBeenCalledTimes(1);
+    expect(axios.get).toHaveBeenCalledWith('/api/products');
+  });
+
+  // ====================================
+  // Test 2: API Error
+  // ====================================
+  test('displays error when API fails', async () => {
+    // Arrange: Mock axios to reject
+    axios.get.mockRejectedValueOnce(new Error('Server error'));
+
+    // Act
+    render(<ProductList />);
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent('Error: Server error');
+    expect(screen.queryByText('Products')).not.toBeInTheDocument();
+  });
+
+  // ====================================
+  // Test 3: Empty Response
+  // ====================================
+  test('handles empty product list', async () => {
+    axios.get.mockResolvedValueOnce({ data: [] });
+
+    render(<ProductList />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading products...')).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Products')).toBeInTheDocument();
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
+  });
+});
+
+4. waitFor - Advanced Async Testing
+Create src/day3-practice/waitFor-examples.test.jsx:
+javascriptimport { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
+
+// ====================================
+// Component with Delayed Updates
+// ====================================
+function SearchBox() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+
+  const handleSearch = async (searchTerm) => {
+    setSearching(true);
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Simulate search results
+    const mockResults = searchTerm 
+      ? [`Result for "${searchTerm}" - 1`, `Result for "${searchTerm}" - 2`]
+      : [];
+    
+    setResults(mockResults);
+    setSearching(false);
+  };
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Search..."
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          handleSearch(e.target.value);
+        }}
+      />
+      {searching && <div>Searching...</div>}
+      <ul>
+        {results.map((result, idx) => (
+          <li key={idx}>{result}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+describe('waitFor - Complete Guide', () => {
+
+  // ====================================
+  // Basic waitFor Usage
+  // ====================================
+  test('waits for search results to appear', async () => {
+    const user = userEvent.setup();
+    render(<SearchBox />);
+
+    const input = screen.getByPlaceholderText('Search...');
+    await user.type(input, 'laptop');
+
+    // waitFor accepts a callback that should eventually not throw
+    await waitFor(() => {
+      expect(screen.getByText('Result for "laptop" - 1')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Result for "laptop" - 2')).toBeInTheDocument();
+  });
+
+  // ====================================
+  // waitFor with Multiple Conditions
+  // ====================================
+  test('waits for loading to finish and results to appear', async () => {
+    const user = userEvent.setup();
+    render(<SearchBox />);
+
+    const input = screen.getByPlaceholderText('Search...');
+    await user.type(input, 'mouse');
+
+    // Wait for searching to finish
+    await waitFor(() => {
+      expect(screen.queryByText('Searching...')).not.toBeInTheDocument();
+    });
+
+    // Results should be present now
+    expect(screen.getByText('Result for "mouse" - 1')).toBeInTheDocument();
+  });
+
+  // ====================================
+  // waitFor with Custom Timeout
+  // ====================================
+  test('waitFor with timeout options', async () => {
+    const user = userEvent.setup();
+    render(<SearchBox />);
+
+    const input = screen.getByPlaceholderText('Search...');
+    await user.type(input, 'keyboard');
+
+    await waitFor(
+      () => {
+        expect(screen.getByText('Result for "keyboard" - 1')).toBeInTheDocument();
+      },
+      {
+        timeout: 2000, // Wait up to 2 seconds
+        interval: 100, // Check every 100ms
+      }
+    );
+  });
+
+  // ====================================
+  // waitFor vs findBy
+  // ====================================
+  test('comparing waitFor and findBy', async () => {
+    const user = userEvent.setup();
+    render(<SearchBox />);
+
+    const input = screen.getByPlaceholderText('Search...');
+    await user.type(input, 'test');
+
+    // Method 1: Using findBy (simpler)
+    const result1 = await screen.findByText('Result for "test" - 1');
+    expect(result1).toBeInTheDocument();
+
+    // Method 2: Using waitFor (more flexible)
+    await waitFor(() => {
+      expect(screen.getByText('Result for "test" - 2')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+**Interview Question:**
+> **Q: When would you use waitFor instead of findBy?**
+```
+A: Use findBy when:
+- Waiting for a single element to appear
+- Simple async scenarios
+
+Use waitFor when:
+- Need to wait for multiple conditions
+- Need to assert element disappearance
+- Need custom timeout/interval
+- Complex async scenarios with multiple state changes
+
+Example:
+// findBy - simple
+await screen.findByText('Loaded');
+
+// waitFor - complex
+await waitFor(() => {
+  expect(screen.queryByText('Loading')).not.toBeInTheDocument();
+  expect(screen.getByText('Data')).toBeInTheDocument();
+  expect(mockFn).toHaveBeenCalled();
+});
+
+5. Real-World Example: Complete CRUD Component
+Create src/day3-practice/crud-component.test.jsx:
+javascriptimport { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+
+jest.mock('axios');
+
+// ====================================
+// CRUD Component (Create, Read, Update, Delete)
+// ====================================
+function TodoApp() {
+  const [todos, setTodos] = useState([]);
+  const [newTodo, setNewTodo] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // READ - Fetch todos
+  useEffect(() => {
+    fetchTodos();
+  }, []);
+
+  const fetchTodos = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/api/todos');
+      setTodos(response.data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load todos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // CREATE - Add todo
+  const addTodo = async (e) => {
+    e.preventDefault();
+    if (!newTodo.trim()) return;
+
+    try {
+      const response = await axios.post('/api/todos', { text: newTodo });
+      setTodos([...todos, response.data]);
+      setNewTodo('');
+    } catch (err) {
+      setError('Failed to add todo');
+    }
+  };
+
+  // DELETE - Remove todo
+  const deleteTodo = async (id) => {
+    try {
+      await axios.delete(`/api/todos/${id}`);
+      setTodos(todos.filter(todo => todo.id !== id));
+    } catch (err) {
+      setError('Failed to delete todo');
+    }
+  };
+
+  if (loading) return <div>Loading todos...</div>;
+
+  return (
+    <div>
+      <h1>My Todos</h1>
+      
+      {error && <div role="alert">{error}</div>}
+
+      <form onSubmit={addTodo}>
+        <input
+          type="text"
+          placeholder="Add new todo..."
+          value={newTodo}
+          onChange={(e) => setNewTodo(e.target.value)}
+        />
+        <button type="submit">Add</button>
+      </form>
+
+      <ul>
+        {todos.map(todo => (
+          <li key={todo.id}>
+            {todo.text}
+            <button onClick={() => deleteTodo(todo.id)}>Delete</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ====================================
+// COMPLETE CRUD TESTS
+// ====================================
+describe('TodoApp - Complete CRUD Testing', () => {
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // ====================================
+  // Test: READ (Initial Load)
+  // ====================================
+  test('loads and displays todos on mount', async () => {
+    const mockTodos = [
+      { id: 1, text: 'Buy groceries', completed: false },
+      { id: 2, text: 'Walk the dog', completed: true },
+      { id: 3, text: 'Write tests', completed: false }
+    ];
+
+    axios.get.mockResolvedValueOnce({ data: mockTodos });
+
+    render(<TodoApp />);
+
+    // Loading state
+    expect(screen.getByText('Loading todos...')).toBeInTheDocument();
+
+    // Wait for todos to load
+    expect(await screen.findByText('Buy groceries')).toBeInTheDocument();
+    expect(screen.getByText('Walk the dog')).toBeInTheDocument();
+    expect(screen.getByText('Write tests')).toBeInTheDocument();
+
+    // API called correctly
+    expect(axios.get).toHaveBeenCalledWith('/api/todos');
+    expect(axios.get).toHaveBeenCalledTimes(1);
+  });
+
+  // ====================================
+  // Test: CREATE (Add Todo)
+  // ====================================
+  test('adds a new todo', async () => {
+    const user = userEvent.setup();
+    const initialTodos = [
+      { id: 1, text: 'Existing todo', completed: false }
+    ];
+    const newTodo = { id: 2, text: 'New todo', completed: false };
+
+    axios.get.mockResolvedValueOnce({ data: initialTodos });
+    axios.post.mockResolvedValueOnce({ data: newTodo });
+
+    render(<TodoApp />);
+
+    // Wait for initial load
+    await screen.findByText('Existing todo');
+
+    // Add new todo
+    const input = screen.getByPlaceholderText('Add new todo...');
+    const addButton = screen.getByRole('button', { name: 'Add' });
+
+    await user.type(input, 'New todo');
+    await user.click(addButton);
+
+    // New todo appears
+    await waitFor(() => {
+      expect(screen.getByText('New todo')).toBeInTheDocument();
+    });
+
+    // API called correctly
+    expect(axios.post).toHaveBeenCalledWith('/api/todos', { text: 'New todo' });
+
+    // Input cleared
+    expect(input).toHaveValue('');
+  });
+
+  // ====================================
+  // Test: DELETE (Remove Todo)
+  // ====================================
+  test('deletes a todo', async () => {
+    const user = userEvent.setup();
+    const mockTodos = [
+      { id: 1, text: 'Todo 1', completed: false },
+      { id: 2, text: 'Todo 2', completed: false }
+    ];
+
+    axios.get.mockResolvedValueOnce({ data: mockTodos });
+    axios.delete.mockResolvedValueOnce({});
+
+    render(<TodoApp />);
+
+    // Wait for todos to load
+    await screen.findByText('Todo 1');
+    expect(screen.getByText('Todo 2')).toBeInTheDocument();
+
+    // Delete first todo
+    const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
+    await user.click(deleteButtons[0]);
+
+    // Todo removed from UI
+    await waitFor(() => {
+      expect(screen.queryByText('Todo 1')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Todo 2')).toBeInTheDocument();
+
+    // API called correctly
+    expect(axios.delete).toHaveBeenCalledWith('/api/todos/1');
+  });
+
+  // ====================================
+  // Test: Error Handling (Load Failure)
+  // ====================================
+  test('displays error when loading fails', async () => {
+    axios.get.mockRejectedValueOnce(new Error('Network error'));
+
+    render(<TodoApp />);
+
+    // Error message appears
+    const errorMessage = await screen.findByRole('alert');
+    expect(errorMessage).toHaveTextContent('Failed to load todos');
+
+    // No todos displayed
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
+  });
+
+  // ====================================
+  // Test: Error Handling (Add Failure)
+  // ====================================
+  test('displays error when adding todo fails', async () => {
+    const user = userEvent.setup();
+    
+    axios.get.mockResolvedValueOnce({ data: [] });
+    axios.post.mockRejectedValueOnce(new Error('Server error'));
+
+    render(<TodoApp />);
+
+    await screen.findByRole('heading', { name: 'My Todos' });
+
+    const input = screen.getByPlaceholderText('Add new todo...');
+    await user.type(input, 'This will fail');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    // Error appears
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to add todo');
+    });
+  });
+
+  // ====================================
+  // Test: Empty Input Validation
+  // ====================================
+  test('does not add empty todo', async () => {
+    const user = userEvent.setup();
+    
+    axios.get.mockResolvedValueOnce({ data: [] });
+
+    render(<TodoApp />);
+    await screen.findByRole('heading');
+
+    const addButton = screen.getByRole('button', { name: 'Add' });
+    await user.click(addButton);
+
+    // axios.post should NOT be called
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+});
+
+6. Testing Custom Hooks with API Calls
+Create src/day3-practice/custom-hooks.test.jsx:
+javascriptimport { renderHook, waitFor } from '@testing-library/react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+
+jest.mock('axios');
+
+// ====================================
+// Custom Hook to Test
+// ====================================
+function useFetch(url) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!url) return;
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(url);
+        setData(response.data);
+        setError(null);
+      } catch (err) {
+        setError(err.message);
+        setData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [url]);
+
+  const refetch = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(url);
+      setData(response.data);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { data, loading, error, refetch };
+}
+
+// ====================================
+// CUSTOM HOOK TESTS
+// ====================================
+describe('useFetch Hook Testing', () => {
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // ====================================
+  // Test: Successful Fetch
+  // ====================================
+  test('fetches data successfully', async () => {
+    const mockData = { id: 1, name: 'Test User' };
+    axios.get.mockResolvedValueOnce({ data: mockData });
+
+    const { result } = renderHook(() => useFetch('/api/user'));
+
+    // Initial state
+    expect(result.current.loading).toBe(true);
+    expect(result.current.data).toBe(null);
+    expect(result.current.error).toBe(null);
+
+    // Wait for data
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.data).toEqual(mockData);
+    expect(result.current.error).toBe(null);
+    expect(axios.get).toHaveBeenCalledWith('/api/user');
+  });
+
+  // ====================================
+  // Test: Error Handling
+  // ====================================
+  test('handles fetch error', async () => {
+    axios.get.mockRejectedValueOnce(new Error('Network error'));
+
+    const { result } = renderHook(() => useFetch('/api/user'));
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBe('Network error');
+    expect(result.current.data).toBe(null);
+  });
+
+  // ====================================
+  // Test: Refetch Function
+  // ====================================
+  test('refetch works correctly', async () => {
+    const mockData1 = { id: 1, name: 'First' };
+    const mockData2 = { id: 1, name: 'Updated' };
+
+    axios.get
+      .mockResolvedValueOnce({ data: mockData1 })
+      .mockResolvedValueOnce({ data: mockData2 });
+
+    const { result } = renderHook(() => useFetch('/api/user'));
+
+    // Wait for initial fetch
+    await waitFor(() => {
+      expect(result.current.data).toEqual(mockData1);
+    });
+
+    // Refetch
+    await result.current.refetch();
+
+    await waitFor(() => {
+      expect(result.current.data).toEqual(mockData2);
+    });
+
+    expect(axios.get).toHaveBeenCalledTimes(2);
+  });
+
+  // ====================================
+  // Test: URL Change
+  // ====================================
+  test('refetches when URL changes', async () => {
+    const mockData1 = { id: 1, name: 'User 1' };
+    const mockData2 = { id: 2, name: 'User 2' };
+
+    axios.get
+      .mockResolvedValueOnce({ data: mockData1 })
+      .mockResolvedValueOnce({ data: mockData2 });
+
+    const { result, rerender } = renderHook(
+      ({ url }) => useFetch(url),
+      { initialProps: { url: '/api/user/1' } }
+    );
+
+    // Wait for first fetch
+    await waitFor(() => {
+      expect(result.current.data).toEqual(mockData1);
+    });
+
+    // Change URL
+    rerender({ url: '/api/user/2' });
+
+    // Wait for second fetch
+    await waitFor(() => {
+      expect(result.current.data).toEqual(mockData2);
+    });
+
+    expect(axios.get).toHaveBeenNthCalledWith(1, '/api/user/1');
+    expect(axios.get).toHaveBeenNthCalledWith(2, '/api/user/2');
+  });
+});
