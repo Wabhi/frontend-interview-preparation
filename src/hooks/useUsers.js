@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-function useUsers() {
+export function useUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -40,5 +40,3 @@ function useUsers() {
 
   return { users, loading, error };
 }
-
-export default useUsers;
