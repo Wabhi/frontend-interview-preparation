@@ -3398,7 +3398,8 @@ Example: Testing a component that fetches data:
 
 2. Mocking Fetch API (Interview Favorite!)
 Create src/day3-practice/fetch-mock.test.jsx:
-javascriptimport { render, screen } from '@testing-library/react';
+javascript
+import { render, screen } from '@testing-library/react';
 import { useState, useEffect } from 'react';
 
 // ====================================

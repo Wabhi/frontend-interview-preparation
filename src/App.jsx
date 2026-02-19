@@ -1,13 +1,14 @@
 import React from "react";
-import '../../testing-mastery/src/App.css'
 import QueryExplained from "./components/query-explained/QueryExplained";
+import FetchMock from "./components/fetch-mock/FetchMock";
 
-const App =()=>{
-  return(
+const App = () => {
+  return (
     <>
-    <QueryExplained/>
+      {/* <QueryExplained/> */}
+      <FetchMock userId={999} />
     </>
-  )
-}
+  );
+};
 
 export default App;
