@@ -74,3 +74,10 @@ button {
   border: 1px solid #ccc;
   cursor: pointer;
 }
+
+p{
+  font-size: x-large;
+  font-weight: bolder;
+  text-align: center;
+  color: #fc2bb6;
+}

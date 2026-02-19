@@ -3294,7 +3294,8 @@ bashnpm install -D axios msw @testing-library/react-hooks
 
 1. The Three Query Types (CRITICAL!)
 Create src/day3-practice/queries-explained.test.jsx:
-javascriptimport { render, screen } from '@testing-library/react';
+javascript
+import { render, screen } from '@testing-library/react';
 import { useState, useEffect } from 'react';
 
 function DataComponent() {
